@@ -47,6 +47,10 @@ import de.bwaldvogel.liblinear.Problem;
 import de.bwaldvogel.liblinear.SolverType;
 import de.bwaldvogel.liblinear.Train;
 
+/**
+ * @deprecated Use RawFeaturesLibLinearModel or HashedFeaturesLibLinearModel instead.
+ *
+ */
 @SuppressWarnings("serial")
 public class LibLinearModel extends BaseModel<TermsDatum> {
     private static final Logger LOGGER = LoggerFactory.getLogger(LibLinearModel.class);
@@ -199,6 +203,8 @@ public class LibLinearModel extends BaseModel<TermsDatum> {
             try {
                 _model = modelFromString(_modelString);
             } catch (IOException e) {
+            	// TODO this should throw the IOException, or we should
+            	// get the model when we read in the string
                 LOGGER.error("Unable to deserialize model from string", e);
             }
         }
@@ -219,7 +225,21 @@ public class LibLinearModel extends BaseModel<TermsDatum> {
         return new DocDatum(labelName, score);
     }
     
+    @Override
+    public String getDetails() {
+    	StringBuilder result = new StringBuilder();
+    	double[] weights = _model.getFeatureWeights();
+
+    	for (int i = 0; i < _uniqueTerms.size(); i++) {
+    		result.append(String.format("\t%s: %f\n", _uniqueTerms.get(i), weights[i]));
+    	}
+    	
+    	return result.toString();
+    }
+    
     private String getModelString() throws IOException {
+    	// TODO get rid of modelString, and handle Java serialization
+    	// ourselves so we can avoid this hack.
         if (_modelString == null) {
             if (_model == null) {
                 train();

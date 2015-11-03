@@ -281,6 +281,21 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     }
     
     
+    @Override
+    public String getDetails() {
+    	StringBuilder result = new StringBuilder();
+    	// TODO output extra info about reduction amount?
+    	
+    	double[] weights = _model.getFeatureWeights();
+
+    	// TODO this isn't of much use, since all we have are weights for hashed indices.
+    	for (int i = 0; i < weights.length; i++) {
+    		result.append(String.format("\t%f\n", weights[i]));
+    	}
+    	
+    	return result.toString();
+    }
+    
     public void setQuietMode(boolean quietMode) {
         _quietMode  = quietMode;
     }

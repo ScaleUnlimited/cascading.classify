@@ -22,14 +22,24 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.scaleunlimited.classify.analyzer.IAnalyzer;
+import com.scaleunlimited.classify.analyzer.StandardAnalyzer;
 import com.scaleunlimited.classify.datum.DocDatum;
 import com.scaleunlimited.classify.datum.FeaturesDatum;
+import com.scaleunlimited.classify.vectors.BaseNormalizer;
+import com.scaleunlimited.classify.vectors.NullNormalizer;
+import com.scaleunlimited.classify.vectors.SetNormalizer;
+import com.scaleunlimited.classify.vectors.TfNormalizer;
+import com.scaleunlimited.classify.vectors.TfidfNormalizer;
+import com.scaleunlimited.classify.vectors.UnitNormalizer;
 
 public class RawFeaturesLibLinearModelTest {
     
@@ -44,7 +54,6 @@ public class RawFeaturesLibLinearModelTest {
     private static final String TEST_MATH_FEATURES= "multiplication\t0.8";
 
     RawFeaturesLibLinearModel _model;
-    static int _testDocIndex = 0;
 
     @Before
     public void setUp() throws Exception {
@@ -119,7 +128,72 @@ public class RawFeaturesLibLinearModelTest {
         Assert.assertEquals(3, nResults.length);
     }
     
-    private FeaturesDatum makeFeaturesDatum(String label, String features) {
+    @Test
+    public void testGettingDetails() throws Exception {
+        for (int i = 0; i < NUM_DOCS; i++) {
+            _model.addTrainingTerms(makeFeaturesDatum("magic", TRAIN_MAGIC_FEATURES));
+        }
+        
+        for (int i = 0; i < NUM_DOCS; i++) {
+            _model.addTrainingTerms(makeFeaturesDatum("math", TRAIN_MATH_FEATURES));
+        }
+        for (int i = 0; i < NUM_DOCS; i++) {
+            _model.addTrainingTerms(makeFeaturesDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES));
+        }
+        _model.train();
+
+        System.out.println(_model.getDetails());
+    }
+    
+    @Test
+    public void testSerializationWithAllNormalizers() throws Exception {
+        testSerialization(NullNormalizer.class);
+        testSerialization(UnitNormalizer.class);
+        testSerialization(SetNormalizer.class);
+        testSerialization(TfNormalizer.class);
+        testSerialization(TfidfNormalizer.class);
+    }
+    
+    private void testSerialization(Class<? extends BaseNormalizer> clazz) throws Exception {
+    	// TODO use normalizer class when constructing model
+        RawFeaturesLibLinearModel model1 = new RawFeaturesLibLinearModel();
+        model1.reset();
+        
+        model1.addTrainingTerms(makeFeaturesDatumFromText("good", "This is an example of some good text"));
+        model1.addTrainingTerms(makeFeaturesDatumFromText("bad", "This has lots of bad words in it"));
+        
+        model1.train();
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutput out = new DataOutputStream(baos);
+        model1.write(out);
+        baos.close();
+        
+        ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+        DataInput in = new DataInputStream(bais);
+        RawFeaturesLibLinearModel model2 = new RawFeaturesLibLinearModel();
+        model2.readFields(in);
+        
+        Assert.assertEquals(model1, model2);
+    }
+
+
+    private FeaturesDatum makeFeaturesDatumFromText(String label, String text) {
+    	Set<String> terms = new HashSet<>();
+    	for (String term : text.split(" ")) {
+    		terms.add(term);
+    	}
+    	
+    	double unitValue = Math.sqrt(terms.size());
+    	Map<String, Double> featureMap = new HashMap<>();
+    	for (String term : terms) {
+    		featureMap.put(term, unitValue);
+    	}
+    	
+		return new FeaturesDatum(featureMap, label);
+	}
+
+	private FeaturesDatum makeFeaturesDatum(String label, String features) {
         Map<String, Double> featureMap = new HashMap<String, Double>();
         String[] split = features.split("\t");
         for (int i = 0; i < split.length; i++) {

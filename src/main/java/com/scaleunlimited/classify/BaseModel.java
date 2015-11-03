@@ -61,6 +61,13 @@ public abstract class BaseModel<T> implements Writable, Serializable {
     abstract public DocDatum classify(T datum);
     
     /**
+     * Generate details about the model.
+     * 
+     * @return Text description of the model.
+     */
+    abstract public String getDetails();
+    
+    /**
      * Initialize the newly constructed (presumably recently deserialized
      * or otherwise constructed) model, particularly its transient fields.
      */

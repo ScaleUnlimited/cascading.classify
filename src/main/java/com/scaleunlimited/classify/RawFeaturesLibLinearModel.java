@@ -45,6 +45,10 @@ import de.bwaldvogel.liblinear.Problem;
 import de.bwaldvogel.liblinear.SolverType;
 import de.bwaldvogel.liblinear.Train;
 
+/**
+ * This is an improved version of LibLinearModel.
+ *
+ */
 @SuppressWarnings("serial")
 public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     private static final Logger LOGGER = LoggerFactory.getLogger(RawFeaturesLibLinearModel.class);
@@ -54,22 +58,24 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     private static final double DEFAULT_EPS = 0.01;
 
     private static final int DEFAULT_NR_FOLD = 5;   // Used when cross validating
-
     
-    private SolverType _solverType = DEFAULT_SOLVER_TYPE;
-    private double _constraintsViolation = DEFAULT_C;
-    private double _eps = DEFAULT_EPS;
-
+    // Data we need to save to recreate the model
     private List<String> _labelNames;
     private List<String> _uniqueTerms;
-    private int _modelLabelIndexes[] = null;
+    private Model _model;
+    
+    // We get this from the model
+    private transient int _modelLabelIndexes[] = null;
 
+    // Data used during training
+    private transient SolverType _solverType = DEFAULT_SOLVER_TYPE;
+    private transient double _constraintsViolation = DEFAULT_C;
+    private transient double _eps = DEFAULT_EPS;
+    private transient boolean _crossValidationRequired = true;
+    private transient boolean _quietMode = false;
     private transient List<String> _labelList;
     private transient List<Map<String, Double>> _featuresList;
-    private transient Model _model;
 
-    private boolean _crossValidationRequired = true;
-    private boolean _quietMode = false;
     
     @Override
     public void reset() {
@@ -107,6 +113,7 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         writeStrings(out, _uniqueTerms);
         
         // Make sure we've got a model to write out.
+        // TODO - throw exception instead of auto-training?
         if (_model == null) {
             train();
         }
@@ -115,7 +122,48 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         LOGGER.info("Model saved successfully");
     }
 
-    public void train() {
+    
+    @Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((_labelNames == null) ? 0 : _labelNames.hashCode());
+		result = prime * result + ((_model == null) ? 0 : _model.hashCode());
+		result = prime * result
+				+ ((_uniqueTerms == null) ? 0 : _uniqueTerms.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		RawFeaturesLibLinearModel other = (RawFeaturesLibLinearModel) obj;
+		if (_labelNames == null) {
+			if (other._labelNames != null)
+				return false;
+		} else if (!_labelNames.equals(other._labelNames))
+			return false;
+		if (_model == null) {
+			if (other._model != null)
+				return false;
+		} else if (!_model.equals(other._model))
+			return false;
+		if (_uniqueTerms == null) {
+			if (other._uniqueTerms != null)
+				return false;
+		} else if (!_uniqueTerms.equals(other._uniqueTerms))
+			return false;
+		return true;
+	}
+
+	public double train(boolean doCrossValidation) {
+
         _uniqueTerms = buildUniqueTerms(_featuresList);
         List<Vector> vectors = new ArrayList<Vector>(_featuresList.size());
         for (Map<String, Double> featureMap : _featuresList) {
@@ -158,7 +206,8 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         _model = Linear.train(problem, param);
         LOGGER.info(String.format("Trained model with %d classes and %d features", _model.getNrClass(), _model.getNrFeature()));
 
-        if (_crossValidationRequired) {
+        double result = 1.0;
+        if (doCrossValidation) {
             double[] target = new double[problem.l];
             LOGGER.info("Cross validating...");
             Linear.crossValidation(problem, param, DEFAULT_NR_FOLD, target);
@@ -169,9 +218,16 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
                 }
             }
             
-            LOGGER.info(String.format("Correct: %d%n", totalCorrect));
-            LOGGER.info(String.format("Cross Validation Accuracy = %g%%%n", 100.0 * totalCorrect / problem.l));
+            LOGGER.debug(String.format("Correct: %d%n", totalCorrect));
+            result = (double)totalCorrect/(double)problem.l;
+            LOGGER.debug(String.format("Cross Validation Accuracy = %g%%%n", 100.0 * result));
         }
+        
+        return result;
+    }
+    
+    public void train() {
+    	train(_crossValidationRequired);
     }
     
     public DocDatum classify(FeaturesDatum datum) {
@@ -188,6 +244,7 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         if (_modelLabelIndexes == null) {
             _modelLabelIndexes = _model.getLabels();
         }
+        
         float score = 0;
         // TODO CSc This could be made more efficient than a linear search
         for (int i = 0; i < _modelLabelIndexes.length; i++) {
@@ -249,6 +306,18 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         
 //        assert(_labelNames.get(topScoreIndex).equals(docDatums[0].getLabel()));
         return docDatums;
+    }
+    
+    @Override
+    public String getDetails() {
+    	StringBuilder result = new StringBuilder();
+    	double[] weights = _model.getFeatureWeights();
+
+    	for (int i = 0; i < _uniqueTerms.size(); i++) {
+    		result.append(String.format("\t%s: %f\n", _uniqueTerms.get(i), weights[i]));
+    	}
+    	
+    	return result.toString();
     }
     
     
