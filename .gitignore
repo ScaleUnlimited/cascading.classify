@@ -4,9 +4,7 @@
 .settings/
 .local.*
 build
-bin/emr
-bin/ec2/setenv.sh
-bin/ec2/support
+bin
 target
 build-eclipse
 src/gen
