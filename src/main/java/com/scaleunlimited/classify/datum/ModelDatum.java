@@ -80,16 +80,15 @@ public class ModelDatum extends BaseDatum {
         dib.reset(modelData.getBytes(), modelData.getLength());
         BaseModel model = (BaseModel)Class.forName(className).newInstance();
         model.readFields(dib);
-        model.reset();
         return model;
     }
 
     public void setModel(BaseModel model) throws IOException {
-        _tupleEntry.set(MODEL_FN, model.getClass().getName());
+        _tupleEntry.setString(MODEL_FN, model.getClass().getName());
         DataOutputBuffer dob = new DataOutputBuffer();
         model.write(dob);
         BytesWritable modelData = new BytesWritable(dob.getData());
-        _tupleEntry.set(MODEL_DATA_FN, modelData);
+        _tupleEntry.setObject(MODEL_DATA_FN, modelData);
     }
     
 }

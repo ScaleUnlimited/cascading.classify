@@ -132,9 +132,8 @@ public abstract class BaseLibLinearModelTest {
     }
     
     private void testSerialization(Class<? extends BaseNormalizer> clazz) throws Exception {
-    	// TODO use normalizer class when constructing model
         BaseLibLinearModel model1 = getModel();
-        model1.reset();
+        model1.setNormalizerClassname(clazz);
         
         model1.addTrainingTerms(makeTermsDatumFromText("good", "This is an example of some good text"));
         model1.addTrainingTerms(makeTermsDatumFromText("bad", "This has lots of bad words in it"));
