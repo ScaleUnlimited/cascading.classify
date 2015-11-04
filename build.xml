@@ -166,6 +166,7 @@
 				<fileset dir="${test.src.dir}">
 					<include name="**/*Test.java" unless="testcase" />
 					<exclude name="**/Abstract*.java" unless="testcase" />
+					<exclude name="**/Base*.java" unless="testcase" />
 					<exclude name="**/ExtendedTestCase.java"
 					         unless="testcase" />
 					<include name="${testcase}" if="testcase" />
