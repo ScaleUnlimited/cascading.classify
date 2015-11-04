@@ -32,8 +32,7 @@ public class ExtractRNTermsWorkflowTest extends GetRNThresholdPipeTest {
     public void setUp() throws Exception {
         super.setUp();
         if (!super.sinkDirsExist()) {
-            GetRNThresholdPipeTest superTest =
-                new GetRNThresholdPipeTest();
+            GetRNThresholdPipeTest superTest = new GetRNThresholdPipeTest();
             superTest.setUp();
             superTest.createFlow();
         }

@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.hadoop.io.Writable;
 
 import com.scaleunlimited.classify.datum.DocDatum;
+import com.scaleunlimited.classify.datum.TermsDatum;
 
 
 /**
@@ -43,9 +44,9 @@ public abstract class BaseModel<T> implements Writable, Serializable {
     }
     
     /**
-     * @param termsDatum input document terms (with label) to help train model
+     * @param datum input document terms (with label) to help train model
      */
-    abstract public void addTrainingTerms(T termsDatum);
+    abstract public void addTrainingTerms(T datum);
 
     /**
      * Use all training documents added via {@link #addTrainingTerms(T)}
@@ -61,6 +62,13 @@ public abstract class BaseModel<T> implements Writable, Serializable {
     abstract public DocDatum classify(T datum);
     
     /**
+     * @param datum (unlabeled) input document terms to be classified
+     * @return top <n> results from classification
+     */
+	abstract public DocDatum[] classifyNResults(T datum, int n);
+
+
+    /**
      * Generate details about the model.
      * 
      * @return Text description of the model.
@@ -68,17 +76,12 @@ public abstract class BaseModel<T> implements Writable, Serializable {
     abstract public String getDetails();
     
     /**
-     * Initialize the newly constructed (presumably recently deserialized
-     * or otherwise constructed) model, particularly its transient fields.
+     * Reset model for another training run.
      */
     public void reset() {
         // Base does nothing.
     }
     
-    public void stats() {
-        // Base does nothing.
-    }
-
     /**
      * @param out stream into which string list should be serialized
      * @param string list to be serialized

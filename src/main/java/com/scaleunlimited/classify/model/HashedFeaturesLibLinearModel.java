@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.scaleunlimited.classify;
+package com.scaleunlimited.classify.model;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -30,108 +31,70 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.apache.mahout.math.RandomAccessSparseVector;
+import org.apache.mahout.math.Vector;
+import org.apache.mahout.math.Vector.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.classify.datum.DocDatum;
-import com.scaleunlimited.classify.datum.FeaturesDatum;
-import com.scaleunlimited.classify.vectors.BaseNormalizer;
+import com.scaleunlimited.classify.datum.TermsDatum;
 
 import de.bwaldvogel.liblinear.Feature;
 import de.bwaldvogel.liblinear.FeatureNode;
 import de.bwaldvogel.liblinear.Linear;
-import de.bwaldvogel.liblinear.Model;
 import de.bwaldvogel.liblinear.Parameter;
 import de.bwaldvogel.liblinear.Problem;
-import de.bwaldvogel.liblinear.SolverType;
 import de.bwaldvogel.liblinear.Train;
 
 @SuppressWarnings("serial")
-public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
+public class HashedFeaturesLibLinearModel extends BaseLibLinearModel {
     private static final Logger LOGGER = LoggerFactory.getLogger(HashedFeaturesLibLinearModel.class);
 
-    private static final SolverType DEFAULT_SOLVER_TYPE = SolverType.L2R_LR;
-    private static final double DEFAULT_C = 10;
-    private static final double DEFAULT_EPS = 0.01;
-
-    private static final int DEFAULT_NR_FOLD = 5;   // Used when cross validating
-
-    // Just in case we have less than 10x this many unique features, don't constrain
-    // it too much
+    // if num features * percent reduction is less than this, keep all of the features
+    // (no reduction)
 	private static final int MIN_FEATURE_SIZE = 10;
     
-    private SolverType _solverType = DEFAULT_SOLVER_TYPE;
-    private double _constraintsViolation = DEFAULT_C;
-    private double _eps = DEFAULT_EPS;
-
-    private float _percentReduction;
-    private List<String> _labelNames;
-    private int _modelLabelIndexes[] = null;
+	// We generate this during training
     private int _maxFeatureIndex;
     
-    private transient List<String> _labelList;
-    private transient List<Map<String, Double>> _featuresList;
-    private transient Model _model;
-
-    private boolean _crossValidationRequired = true;
-    private boolean _quietMode = false;
-    private boolean _averageCollisions = true;
+    // Values we need during training only, thus not saved
+    private transient float _percentReduction = 0.10f;
+    private transient boolean _averageCollisions = true;
     
     public HashedFeaturesLibLinearModel() {
         super();
     }
 
-    public HashedFeaturesLibLinearModel(float percentReduction) {
-        super();
-        
-        _percentReduction = percentReduction;
+    public HashedFeaturesLibLinearModel setPercentReduction(float percentReduction) {
+    	_percentReduction = percentReduction;
+    	return this;
+    }
+    
+    public HashedFeaturesLibLinearModel setAverageCollisions(boolean averageCollisions) {
+    	_averageCollisions = averageCollisions;
+    	return this;
     }
     
     @Override
-    public void reset() {
-        if (_labelList == null) {
-            _labelList = new ArrayList<String>();
-        } else {
-            _labelList.clear();
-        }
-        
-        if (_featuresList == null) {
-            _featuresList = new ArrayList<Map<String, Double>>();
-        } else {
-            _featuresList.clear();
-        }
-    }
-
-    @Override
-    public void addTrainingTerms(FeaturesDatum featuresDatum) {
-        _model = null;
-        _labelList.add(featuresDatum.getLabel());
-        _featuresList.add(featuresDatum.getFeatureMap());
-    }
-
-    @Override
     public void readFields(DataInput in) throws IOException {
-        _labelNames = readStrings(in);
+    	super.readFields(in);
         _maxFeatureIndex = in.readInt();
-        _model = Linear.loadModel(in);
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-        LOGGER.info("Saving model...");
-        
-        // Make sure we've got a model to write out.
-        if (_model == null) {
-            train();
-        }
-        
-        writeStrings(out, _labelNames);
+    	super.write(out);
         out.writeInt(_maxFeatureIndex);
-        Linear.saveModel(out, _model);
-        LOGGER.info("Model saved successfully");
     }
 
+    @Override
     public void train() {
+    	train(_crossValidationRequired);
+    }
+    
+    @Override
+    public double train(boolean doCrossValidation) {
     	// First generate list of unique labels, so we can map a label to an index.
         _labelNames = new ArrayList<String>();
         for (String label : _labelList) {
@@ -157,19 +120,20 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         // we're below that, just set it to the # of features - 1 (so some hashing
         // will occur, for testing).
         Set<String> uniqueFeatures = new HashSet<String>();
-        for (Map<String, Double> featuresMap : _featuresList) {
-        	uniqueFeatures.addAll(featuresMap.keySet());
+        for (Map<String, Integer> termsMap : _featuresList) {
+        	uniqueFeatures.addAll(termsMap.keySet());
         }
+        
         _maxFeatureIndex = Math.round(uniqueFeatures.size() * _percentReduction);
-    	LOGGER.info(String.format("Setting max feature index to be %d", _maxFeatureIndex));
+    	LOGGER.debug(String.format("Setting max feature index to be %d", _maxFeatureIndex));
         if (_maxFeatureIndex < MIN_FEATURE_SIZE) {
         	_maxFeatureIndex = uniqueFeatures.size() - 1;
-        	LOGGER.info(String.format("Resetting max feature index to be %d", _maxFeatureIndex));
+        	LOGGER.debug(String.format("Resetting max feature index to be %d", _maxFeatureIndex));
         }
         
         List<Feature[]> features = new ArrayList<Feature[]>(_featuresList.size());
-        for (Map<String, Double> featuresMap : _featuresList) {
-        	features.add(getFeatures(featuresMap));
+        for (Map<String, Integer> termsMap : _featuresList) {
+        	features.add(getFeatures(termsMap));
         }
         
         _featuresList.clear();
@@ -178,20 +142,21 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
             Linear.disableDebugOutput();
         }
         
-        LOGGER.info("Constructing problem for training...");
+        LOGGER.debug("Constructing problem for training...");
         Problem problem = Train.constructProblem(   labelIndexList,
         											features,
         											_maxFeatureIndex + 1,
                                                     -1.0);
         Parameter param = createParameter();
         
-        LOGGER.info("Starting training...");
+        LOGGER.debug("Starting training...");
         _model = Linear.train(problem, param);
-        LOGGER.info(String.format("Trained model with %d classes and %d features", _model.getNrClass(), _model.getNrFeature()));
+        LOGGER.debug(String.format("Trained model with %d classes and %d features", _model.getNrClass(), _model.getNrFeature()));
 
-        if (_crossValidationRequired) {
+        double crossValidationAccuracy = 0.0;
+        if (doCrossValidation) {
             double[] target = new double[problem.l];
-            LOGGER.info("Cross validating...");
+            LOGGER.debug("Cross validating...");
             Linear.crossValidation(problem, param, DEFAULT_NR_FOLD, target);
             int totalCorrect = 0;
             for (int i = 0; i < problem.l; i++) {
@@ -200,13 +165,17 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
                 }
             }
             
-            LOGGER.info(String.format("Correct: %d%n", totalCorrect));
-            LOGGER.info(String.format("Cross Validation Accuracy = %g%%%n", 100.0 * totalCorrect / problem.l));
+            crossValidationAccuracy = (double)totalCorrect / (double)problem.l;
+            LOGGER.debug(String.format("Correct: %d%n", totalCorrect));
+            LOGGER.debug(String.format("Cross Validation Accuracy = %g%%%n", 100.0 * crossValidationAccuracy));
         }
+        
+        return crossValidationAccuracy;
     }
     
-    public DocDatum classify(FeaturesDatum datum) {
-        Feature[] features = getFeatures(datum.getFeatureMap());
+    @Override
+    public DocDatum classify(TermsDatum datum) {
+        Feature[] features = getFeatures(datum.getTermMap());
         double[] probEstimates = new double[_labelNames.size()];
         
         int labelIndex = (int)Linear.predictProbability(_model,
@@ -225,11 +194,12 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
                 score = (float)(probEstimates[i]);
             }
         }
+        
         return new DocDatum(labelName, score);
     }
     
-    public DocDatum[] classifyNResults(FeaturesDatum datum, int n) {
-        Feature[] features = getFeatures(datum.getFeatureMap());
+    public DocDatum[] classifyNResults(TermsDatum datum, int n) {
+        Feature[] features = getFeatures(datum.getTermMap());
         double[] probEstimates = new double[_labelNames.size()];
         
 //        int topScoreIndex = 
@@ -283,48 +253,10 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     
     @Override
     public String getDetails() {
-    	StringBuilder result = new StringBuilder();
+    	StringBuilder result = new StringBuilder(super.getDetails());
     	// TODO output extra info about reduction amount?
     	
-    	double[] weights = _model.getFeatureWeights();
-
-    	// TODO this isn't of much use, since all we have are weights for hashed indices.
-    	for (int i = 0; i < weights.length; i++) {
-    		result.append(String.format("\t%f\n", weights[i]));
-    	}
-    	
     	return result.toString();
-    }
-    
-    public void setQuietMode(boolean quietMode) {
-        _quietMode  = quietMode;
-    }
-
-    public void setCrossValidation(boolean required) {
-        _crossValidationRequired  = required;
-    }
-    
-    public void setAverageCollisions(boolean averageCollisions) {
-    	_averageCollisions = averageCollisions;
-    }
-    
-    public void setMultiClassSolverType(boolean multiClassSolverType) {
-        if (multiClassSolverType) {
-            _solverType = SolverType.MCSVM_CS;
-            _eps = 0.1;
-        }
-    }
-    
-    public void setC(double c) {
-        _constraintsViolation = c;
-    }
-
-    public void setEPS(double eps) {
-        _eps = eps;
-    }
-
-    private Parameter createParameter() {
-        return new Parameter(_solverType, _constraintsViolation, _eps);
     }
     
 	public static int calcHashBuiltin(String term, int modulo) {
@@ -393,97 +325,63 @@ public class HashedFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     }
 
     /**
-     * Given a map from term to score, generate a feature array using
+     * Given a map from term to count, generate a feature array using
      * _maxFeatureIndex as the max index, based on the hash of the term.
      * 
      * @param terms
-     * @param maxIndex
-     * @return
+     * @return array of LibLinear features
      */
     
-    private Feature[] getFeatures(Map<String, Double> terms) {
-    	
-    	List<FeatureNode> features = new ArrayList<FeatureNode>(terms.size());
+    private Feature[] getFeatures(Map<String, Integer> terms) {
+
+    	// First create the vector, where each term's index is the hash
+    	// of the term, and the value is the term count.
+    	Map<Integer, Integer> collisionCount = new HashMap<>();
+    	Vector v = new RandomAccessSparseVector(_maxFeatureIndex);
     	for (String term: terms.keySet()) {
     		int index = calcHashJoaat(term, _maxFeatureIndex);
-    		features.add(new FeatureNode(index + 1, terms.get(term)));
+    		double curValue = v.getQuick(index);
+    		if (_averageCollisions && (curValue != 0.0)) {
+    			Integer curCollisionCount = collisionCount.get(index);
+    			if (curCollisionCount == null) {
+    				// Number of values we'll need to divide by
+    				collisionCount.put(index, 2);
+    			} else {
+    				collisionCount.put(index, curCollisionCount + 1);
+    			}
+
+    			v.setQuick(index, curValue + terms.get(term));
+    		} else {
+    			v.setQuick(index, terms.get(term));
+    		}
     	}
-    	
-    	if (features.size() == 0) {
-    		return new FeatureNode[0];
+
+    	// Now adjust the vector for collisions, if needed.
+    	if (_averageCollisions && !collisionCount.isEmpty()) {
+    		for (Integer index : collisionCount.keySet()) {
+    			double curValue = v.getQuick(index);
+    			v.setQuick(index, curValue / collisionCount.get(index));
+    		}
     	}
-    	
-    	// Sort features from low to high by index.
+
+    	// Apply the term vector normalizer.
+    	getNormalizer().normalize(v);
+
+    	List<FeatureNode> features = new ArrayList<FeatureNode>(terms.size());
+    	for (Element e : v.nonZeroes()) {
+    		features.add(new FeatureNode(e.index() + 1, e.get()));
+    	}
+
+    	// We need to sort by increasing index.
     	Collections.sort(features, new Comparator<FeatureNode>() {
 
-			@Override
-			public int compare(FeatureNode o1, FeatureNode o2) {
-				return o1.index - o2.index;
-			}
-		});
-    	
-    	// If we have any that need to be merged (indexes are the same, due to
-    	// hash collision) then we have an extra step here.
-    	List<FeatureNode> result = new ArrayList<FeatureNode>(features.size());
-
-    	FeatureNode curFeature = null;
-    	int numToCombine = 0;
-    	
-    	for (FeatureNode feature : features) {
-    		if ((curFeature != null) && (feature.index == curFeature.index)) {
-    			if (_averageCollisions) {
-    				numToCombine += 1;
-    				curFeature.value += feature.value;
-    			}
-    			continue;
+    		@Override
+    		public int compare(FeatureNode o1, FeatureNode o2) {
+    			return o1.index - o2.index;
     		}
-    		
-    		if (curFeature != null) {
-    			curFeature.value /= numToCombine;
-    			result.add(curFeature);
-    		}
-    		
-			curFeature = feature;
-			numToCombine = 1;
-    	}
-    	
-		if (curFeature != null) {
-			curFeature.value /= numToCombine;
-			result.add(curFeature);
-		}
+    	});
 
-		return result.toArray(new FeatureNode[result.size()]);
-    }
-    
-
-    private class LabelIndexScore implements Comparable<LabelIndexScore> {
-    
-        private int _labelIndex;
-        private double _score;
-        
-        public LabelIndexScore(int labelIndex, double score) {
-            _labelIndex = labelIndex;
-            _score = score;
-        }
-    
-        public int getLabelIndex() {
-            return _labelIndex;
-        }
-    
-        public double getScore() {
-            return _score;
-        }
-    
-        @Override
-        public int compareTo(LabelIndexScore a) {
-            if (_score < a.getScore()) {
-                return -1;
-            } else if (_score == a.getScore()) {
-                return 0;
-            } else {
-                return 1;
-            }
-        }
+    	return features.toArray(new FeatureNode[features.size()]);
     }
 
 }

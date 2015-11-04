@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.scaleunlimited.classify;
+package com.scaleunlimited.classify.model;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -33,16 +33,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.classify.datum.DocDatum;
-import com.scaleunlimited.classify.datum.FeaturesDatum;
+import com.scaleunlimited.classify.datum.TermsDatum;
 import com.scaleunlimited.classify.vectors.VectorUtils;
 
 import de.bwaldvogel.liblinear.Feature;
 import de.bwaldvogel.liblinear.FeatureNode;
 import de.bwaldvogel.liblinear.Linear;
-import de.bwaldvogel.liblinear.Model;
 import de.bwaldvogel.liblinear.Parameter;
 import de.bwaldvogel.liblinear.Problem;
-import de.bwaldvogel.liblinear.SolverType;
 import de.bwaldvogel.liblinear.Train;
 
 /**
@@ -50,86 +48,31 @@ import de.bwaldvogel.liblinear.Train;
  *
  */
 @SuppressWarnings("serial")
-public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
+public class RawFeaturesLibLinearModel extends BaseLibLinearModel {
     private static final Logger LOGGER = LoggerFactory.getLogger(RawFeaturesLibLinearModel.class);
 
-    private static final SolverType DEFAULT_SOLVER_TYPE = SolverType.L2R_LR;
-    private static final double DEFAULT_C = 10;
-    private static final double DEFAULT_EPS = 0.01;
-
-    private static final int DEFAULT_NR_FOLD = 5;   // Used when cross validating
-    
     // Data we need to save to recreate the model
-    private List<String> _labelNames;
     private List<String> _uniqueTerms;
-    private Model _model;
     
-    // We get this from the model
-    private transient int _modelLabelIndexes[] = null;
-
-    // Data used during training
-    private transient SolverType _solverType = DEFAULT_SOLVER_TYPE;
-    private transient double _constraintsViolation = DEFAULT_C;
-    private transient double _eps = DEFAULT_EPS;
-    private transient boolean _crossValidationRequired = true;
-    private transient boolean _quietMode = false;
-    private transient List<String> _labelList;
-    private transient List<Map<String, Double>> _featuresList;
-
-    
-    @Override
-    public void reset() {
-        if (_labelList == null) {
-            _labelList = new ArrayList<String>();
-        } else {
-            _labelList.clear();
-        }
-        
-        if (_featuresList == null) {
-            _featuresList = new ArrayList<Map<String, Double>>();
-        } else {
-            _featuresList.clear();
-        }
-    }
-
-    @Override
-    public void addTrainingTerms(FeaturesDatum featuresDatum) {
-        _model = null;
-        _labelList.add(featuresDatum.getLabel());
-        _featuresList.add(featuresDatum.getFeatureMap());
-    }
-
     @Override
     public void readFields(DataInput in) throws IOException {
-        _labelNames = readStrings(in);
+    	super.readFields(in);
+    	
         _uniqueTerms = readStrings(in);
-        _model = Linear.loadModel(in);
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-        LOGGER.info("Saving model...");
-        writeStrings(out, _labelNames);
-        writeStrings(out, _uniqueTerms);
-        
-        // Make sure we've got a model to write out.
-        // TODO - throw exception instead of auto-training?
-        if (_model == null) {
-            train();
-        }
-        
-        Linear.saveModel(out, _model);
-        LOGGER.info("Model saved successfully");
-    }
+    	super.write(out);
 
+        writeStrings(out, _uniqueTerms);
+    }
     
-    @Override
+    
+	@Override
 	public int hashCode() {
 		final int prime = 31;
-		int result = 1;
-		result = prime * result
-				+ ((_labelNames == null) ? 0 : _labelNames.hashCode());
-		result = prime * result + ((_model == null) ? 0 : _model.hashCode());
+		int result = super.hashCode();
 		result = prime * result
 				+ ((_uniqueTerms == null) ? 0 : _uniqueTerms.hashCode());
 		return result;
@@ -139,21 +82,11 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
-		if (obj == null)
+		if (!super.equals(obj))
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
 		RawFeaturesLibLinearModel other = (RawFeaturesLibLinearModel) obj;
-		if (_labelNames == null) {
-			if (other._labelNames != null)
-				return false;
-		} else if (!_labelNames.equals(other._labelNames))
-			return false;
-		if (_model == null) {
-			if (other._model != null)
-				return false;
-		} else if (!_model.equals(other._model))
-			return false;
 		if (_uniqueTerms == null) {
 			if (other._uniqueTerms != null)
 				return false;
@@ -162,12 +95,13 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
 		return true;
 	}
 
+	@Override
 	public double train(boolean doCrossValidation) {
 
         _uniqueTerms = buildUniqueTerms(_featuresList);
         List<Vector> vectors = new ArrayList<Vector>(_featuresList.size());
-        for (Map<String, Double> featureMap : _featuresList) {
-            vectors.add(VectorUtils.makeVectorDouble(_uniqueTerms, featureMap));
+        for (Map<String, Integer> termMap : _featuresList) {
+            vectors.add(makeNormalizedVector(termMap));
         }
         
         _labelNames = new ArrayList<String>();
@@ -226,13 +160,23 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         return result;
     }
     
+    protected Vector makeNormalizedVector(Map<String, Integer> termMap) {
+    	// We assume that _uniqueTerms has been set up, as a sorted list, so
+    	// we can use that to create an appropriate vector.
+    	Vector result = VectorUtils.makeVector(_uniqueTerms, termMap);
+    	getNormalizer().normalize(result);
+    	
+		return result;
+	}
+    
     public void train() {
     	train(_crossValidationRequired);
     }
     
-    public DocDatum classify(FeaturesDatum datum) {
+    @Override
+    public DocDatum classify(TermsDatum datum) {
+        Vector docVector = makeNormalizedVector(datum.getTermMap());
         
-        Vector docVector = VectorUtils.makeVectorDouble(_uniqueTerms, datum.getFeatureMap());
         FeatureNode[] features = vectorToFeatureNodes(docVector);
         double[] probEstimates = new double[_labelNames.size()];
         
@@ -255,8 +199,9 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         return new DocDatum(labelName, score);
     }
     
-    public DocDatum[] classifyNResults(FeaturesDatum datum, int n) {
-        Vector docVector = VectorUtils.makeVectorDouble(_uniqueTerms, datum.getFeatureMap());
+    @Override
+	public DocDatum[] classifyNResults(TermsDatum datum, int n) {
+        Vector docVector = makeNormalizedVector(datum.getTermMap());
         FeatureNode[] features = vectorToFeatureNodes(docVector);
         double[] probEstimates = new double[_labelNames.size()];
         
@@ -310,7 +255,7 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     
     @Override
     public String getDetails() {
-    	StringBuilder result = new StringBuilder();
+    	StringBuilder result = new StringBuilder(super.getDetails());
     	double[] weights = _model.getFeatureWeights();
 
     	for (int i = 0; i < _uniqueTerms.size(); i++) {
@@ -320,33 +265,6 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
     	return result.toString();
     }
     
-    
-    public void setQuietMode(boolean quietMode) {
-        _quietMode  = quietMode;
-    }
-
-    public void setCrossValidation(boolean required) {
-        _crossValidationRequired  = required;
-    }
-    
-    public void setMultiClassSolverType(boolean multiClassSolverType) {
-        if (multiClassSolverType) {
-            _solverType = SolverType.MCSVM_CS;
-            _eps = 0.1;
-        }
-    }
-    
-    public void setC(double c) {
-        _constraintsViolation = c;
-    }
-
-    public void setEPS(double eps) {
-        _eps = eps;
-    }
-
-    private Parameter createParameter() {
-        return new Parameter(_solverType, _constraintsViolation, _eps);
-    }
     
     private List<Feature[]> getFeaturesList(List<Vector> vectors) {
         List<Feature[]> result = new ArrayList<Feature[]>();
@@ -374,44 +292,14 @@ public class RawFeaturesLibLinearModel extends BaseModel<FeaturesDatum> {
         return x;
     }
     
-    private List<String> buildUniqueTerms(List<Map<String, Double>> featuresList) {
+    private List<String> buildUniqueTerms(List<Map<String, Integer>> featuresList) {
         Set<String> uniqueTerms = new HashSet<String>();
-        for (Map<String, Double> termMap : featuresList) {
+        for (Map<String, Integer> termMap : featuresList) {
             uniqueTerms.addAll(termMap.keySet());
         }
         List<String> sortedTerms = new ArrayList<String>(uniqueTerms);
         Collections.sort(sortedTerms);
         return sortedTerms;
-    }
-
-    private class LabelIndexScore implements Comparable<LabelIndexScore> {
-    
-        private int _labelIndex;
-        private double _score;
-        
-        public LabelIndexScore(int labelIndex, double score) {
-            _labelIndex = labelIndex;
-            _score = score;
-        }
-    
-        public int getLabelIndex() {
-            return _labelIndex;
-        }
-    
-        public double getScore() {
-            return _score;
-        }
-    
-        @Override
-        public int compareTo(LabelIndexScore a) {
-            if (_score < a.getScore()) {
-                return -1;
-            } else if (_score == a.getScore()) {
-                return 0;
-            } else {
-                return 1;
-            }
-        }
     }
 
 }

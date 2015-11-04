@@ -33,22 +33,6 @@ public abstract class BaseNormalizer implements Serializable {
 
     abstract public void normalize(Vector vector);
 
-    public void normalize(List<? extends Vector> vectors) {
-        if (vectors.size() == 0) {
-            throw new IllegalArgumentException("Can't normalize empty list of vectors");
-        }
-        
-        final int numDocs = vectors.size();
-        LOGGER.debug(String.format("Beginning normalization of %d vectors", numDocs));
-        
-        for (Vector v : vectors) {
-            normalize(v);
-        }
-
-        LOGGER.debug(String.format("Finished normalization of %d vectors", numDocs));
-    }
-    
-    
     public static void dumpTopTerms(final Vector docFrequencies, List<String> uniqueTerms) {
         int cardinality = docFrequencies.size();
         List<Integer> sortedDocFrequencyIndexes = new ArrayList<Integer>(cardinality);

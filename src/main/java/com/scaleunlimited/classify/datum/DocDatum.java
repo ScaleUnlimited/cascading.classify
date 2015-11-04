@@ -69,7 +69,7 @@ public class DocDatum extends PayloadDatum {
     }
 
     public void setLabel(String label) {
-        _tupleEntry.set(LABEL_FN, label);
+        _tupleEntry.setString(LABEL_FN, label);
     }
 
     public float getScore() {
@@ -77,7 +77,7 @@ public class DocDatum extends PayloadDatum {
     }
 
     public void setScore(float score) {
-        _tupleEntry.set(SCORE_FN, score);
+        _tupleEntry.setFloat(SCORE_FN, score);
     }
 
 }

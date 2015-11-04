@@ -70,7 +70,7 @@ public class ModelDatum extends BaseDatum {
     }
 
     public void setAnalyzer(IAnalyzer analyzer) {
-        _tupleEntry.set(ANALYZER_FN, analyzer.getClass().getName());
+        _tupleEntry.setString(ANALYZER_FN, analyzer.getClass().getName());
     }
     
     public BaseModel getModel() throws Exception {

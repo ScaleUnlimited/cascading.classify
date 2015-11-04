@@ -42,7 +42,7 @@ public class TrainSpyModelPipeTest extends AnalyzeTrainingDataPipeTest {
         TrainSpyModelOptions options = new TrainSpyModelOptions();
         options.setDebugLogging(true);
         options.setWorkingDir(WORKING_DIR);
-        options.setModelName("LibLinear");
+        options.setModelName("RawFeaturesLibLinear");
         int nextIterationIndex =
             ExtractRNTermsWorkflow.getNextIterationIndex( _platform, _workingDirPath);
         options.setRandomSeed(nextIterationIndex);

@@ -45,7 +45,7 @@ public class TrainFinalModelPipeTest extends ExtractRNTermsWorkflowTest {
         options.setDebugLogging(true);
         options.setWorkingDir(WORKING_DIR);
         options.setAnalyzerName("Standard");
-        options.setModelName("LibLinear");
+        options.setModelName("RawFeaturesLibLinear");
         Flow flow = TrainFinalModelPipe.createFlow(_platform, options);
         flow.complete();
         this.checkSinkDirsExist();

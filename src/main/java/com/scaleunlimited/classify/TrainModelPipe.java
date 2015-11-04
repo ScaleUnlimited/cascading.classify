@@ -136,7 +136,7 @@ public class TrainModelPipe extends SubAssembly {
 
     public static BaseModel makeModel(String modelName) {
         BaseModel result;
-        String fullModelName = "com.scaleunlimited.classify." + modelName + "Model";
+        String fullModelName = "com.scaleunlimited.classify.model." + modelName + "Model";
         try {
             result = (BaseModel)Class.forName(fullModelName).newInstance();
         } catch (Exception e) {

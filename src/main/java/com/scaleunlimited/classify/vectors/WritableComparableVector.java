@@ -26,6 +26,8 @@ import org.apache.mahout.math.VectorWritable;
 
 public class WritableComparableVector implements WritableComparable<WritableComparableVector> {
 
+	private static Configuration CONF = new Configuration();
+	
     private Vector _vector;
     
     public WritableComparableVector(Vector vector) {
@@ -42,8 +44,7 @@ public class WritableComparableVector implements WritableComparable<WritableComp
         
         // VectorWritable relies on having a valid conf - not sure how
         // that normally gets set up w/Mahout, but this seems to work.
-        // TODO use a static singleton configuration here.
-        v.setConf(new Configuration());
+        v.setConf(CONF);
         v.readFields(in);
         _vector = v.get();
     }

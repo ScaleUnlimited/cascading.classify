@@ -1,19 +1,4 @@
-/**
- * Copyright (c) 2009-2015 Scale Unlimited, Inc.
- * 
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *     http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package com.scaleunlimited.classify;
+package com.scaleunlimited.classify.model;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -22,27 +7,22 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Test;
 
-import com.scaleunlimited.classify.analyzer.IAnalyzer;
-import com.scaleunlimited.classify.analyzer.StandardAnalyzer;
 import com.scaleunlimited.classify.datum.DocDatum;
-import com.scaleunlimited.classify.datum.FeaturesDatum;
+import com.scaleunlimited.classify.datum.TermsDatum;
+import com.scaleunlimited.classify.model.BaseLibLinearModel;
 import com.scaleunlimited.classify.vectors.BaseNormalizer;
 import com.scaleunlimited.classify.vectors.NullNormalizer;
 import com.scaleunlimited.classify.vectors.SetNormalizer;
 import com.scaleunlimited.classify.vectors.TfNormalizer;
-import com.scaleunlimited.classify.vectors.TfidfNormalizer;
 import com.scaleunlimited.classify.vectors.UnitNormalizer;
 
-public class RawFeaturesLibLinearModelTest {
-    
+public abstract class BaseLibLinearModelTest {
+
     private static final int NUM_DOCS = 10;
     
     private static final String TRAIN_MAGIC_FEATURES= "Abracadabra\t0.59\tmagic\t0.8\tcaramba\t0.6";
@@ -53,26 +33,26 @@ public class RawFeaturesLibLinearModelTest {
     private static final String TEST_MAGIC_FEATURES= "magic\t0.8";
     private static final String TEST_MATH_FEATURES= "multiplication\t0.8";
 
-    RawFeaturesLibLinearModel _model;
+    BaseLibLinearModel _model;
 
     @Before
     public void setUp() throws Exception {
-        _model = new RawFeaturesLibLinearModel();
-        _model.reset();
+        _model = getModel();
     }
 
-    @Test
-    public void testModel() throws Exception {
+    abstract protected BaseLibLinearModel getModel();
+    
+    protected void testModel() throws Exception {
         
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("magic", TRAIN_MAGIC_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("magic", TRAIN_MAGIC_FEATURES));
         }
         
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("math", TRAIN_MATH_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("math", TRAIN_MATH_FEATURES));
         }
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES));
         }
         _model.train();
         
@@ -86,17 +66,17 @@ public class RawFeaturesLibLinearModelTest {
         
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         DataInput in = new DataInputStream(bais);
-        RawFeaturesLibLinearModel newModel = new RawFeaturesLibLinearModel();
+        BaseLibLinearModel newModel = getModel();
         newModel.readFields(in);
         
         validateModel(newModel);
     }
     
-    private void validateModel(RawFeaturesLibLinearModel model) {
-        FeaturesDatum magicDoc = makeFeaturesDatum("magic", TEST_MAGIC_FEATURES);
-        FeaturesDatum mathDoc = makeFeaturesDatum("math", TEST_MATH_FEATURES);
-        FeaturesDatum emDoc = makeFeaturesDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES);
-        FeaturesDatum mixedDoc = makeFeaturesDatum("magic", TRAIN_MIXED_FEATURES);
+    private void validateModel(BaseLibLinearModel model) {
+        TermsDatum magicDoc = makeTermsDatum("magic", TEST_MAGIC_FEATURES);
+        TermsDatum mathDoc = makeTermsDatum("math", TEST_MATH_FEATURES);
+        TermsDatum emDoc = makeTermsDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES);
+        TermsDatum mixedDoc = makeTermsDatum("magic", TRAIN_MIXED_FEATURES);
 
         Assert.assertEquals("Magic doc failed",
                             "magic",
@@ -128,39 +108,36 @@ public class RawFeaturesLibLinearModelTest {
         Assert.assertEquals(3, nResults.length);
     }
     
-    @Test
-    public void testGettingDetails() throws Exception {
+    protected void testGettingDetails() throws Exception {
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("magic", TRAIN_MAGIC_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("magic", TRAIN_MAGIC_FEATURES));
         }
         
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("math", TRAIN_MATH_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("math", TRAIN_MATH_FEATURES));
         }
         for (int i = 0; i < NUM_DOCS; i++) {
-            _model.addTrainingTerms(makeFeaturesDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES));
+            _model.addTrainingTerms(makeTermsDatum("electromagnetic", TRAIN_ELECTROMAGNETIC_FEATURES));
         }
         _model.train();
 
         System.out.println(_model.getDetails());
     }
     
-    @Test
-    public void testSerializationWithAllNormalizers() throws Exception {
+    protected void testSerializationWithAllNormalizers() throws Exception {
         testSerialization(NullNormalizer.class);
         testSerialization(UnitNormalizer.class);
         testSerialization(SetNormalizer.class);
         testSerialization(TfNormalizer.class);
-        testSerialization(TfidfNormalizer.class);
     }
     
     private void testSerialization(Class<? extends BaseNormalizer> clazz) throws Exception {
     	// TODO use normalizer class when constructing model
-        RawFeaturesLibLinearModel model1 = new RawFeaturesLibLinearModel();
+        BaseLibLinearModel model1 = getModel();
         model1.reset();
         
-        model1.addTrainingTerms(makeFeaturesDatumFromText("good", "This is an example of some good text"));
-        model1.addTrainingTerms(makeFeaturesDatumFromText("bad", "This has lots of bad words in it"));
+        model1.addTrainingTerms(makeTermsDatumFromText("good", "This is an example of some good text"));
+        model1.addTrainingTerms(makeTermsDatumFromText("bad", "This has lots of bad words in it"));
         
         model1.train();
         
@@ -171,36 +148,38 @@ public class RawFeaturesLibLinearModelTest {
         
         ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
         DataInput in = new DataInputStream(bais);
-        RawFeaturesLibLinearModel model2 = new RawFeaturesLibLinearModel();
+        BaseLibLinearModel model2 = getModel();
         model2.readFields(in);
         
         Assert.assertEquals(model1, model2);
     }
 
 
-    private FeaturesDatum makeFeaturesDatumFromText(String label, String text) {
-    	Set<String> terms = new HashSet<>();
+    private TermsDatum makeTermsDatumFromText(String label, String text) {
+    	Map<String, Integer> termsMap = new HashMap<>();
     	for (String term : text.split(" ")) {
-    		terms.add(term);
+    		Integer count = termsMap.get(term);
+    		if (count == null) {
+    			termsMap.put(term, 1);
+    		} else {
+    			termsMap.put(term, count + 1);
+    		}
     	}
     	
-    	double unitValue = Math.sqrt(terms.size());
-    	Map<String, Double> featureMap = new HashMap<>();
-    	for (String term : terms) {
-    		featureMap.put(term, unitValue);
-    	}
-    	
-		return new FeaturesDatum(featureMap, label);
+		return new TermsDatum(termsMap, label);
 	}
 
-	private FeaturesDatum makeFeaturesDatum(String label, String features) {
-        Map<String, Double> featureMap = new HashMap<String, Double>();
+	private TermsDatum makeTermsDatum(String label, String features) {
+        Map<String, Integer> termsMap = new HashMap<String, Integer>();
         String[] split = features.split("\t");
         for (int i = 0; i < split.length; i++) {
-            featureMap.put(split[i], Double.parseDouble(split[i+1]));
+        	// We get data in the form of <term><tab><term frequency>, so convert that into
+        	// term and term count
+        	termsMap.put(split[i], (int)Math.round(100.0 * Double.parseDouble(split[i+1])));
             i++;
         }
-        return new FeaturesDatum(featureMap, label);
+        
+        return new TermsDatum(termsMap, label);
     }
    
     

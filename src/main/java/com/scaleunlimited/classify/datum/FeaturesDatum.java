@@ -27,8 +27,6 @@ import com.scaleunlimited.classify.BaseModel;
  * Input to the classification model ({@link BaseModel} subclass)
  * for a single document that already has computed feature values 
  * Training documents should have non-null labels.
- * 
- * TODO CSc Support training score <i>input</i> as well?
  */
 @SuppressWarnings("serial")
 public class FeaturesDatum extends LabeledDatum {

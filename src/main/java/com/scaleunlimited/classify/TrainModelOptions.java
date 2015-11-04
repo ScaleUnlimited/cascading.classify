@@ -19,8 +19,8 @@ import org.kohsuke.args4j.Option;
 
 public class TrainModelOptions extends ClassifyOptions {
 
-    private static final String DEFAULT_ANALYZER_NAME = "Zemanta";
-    private static final String DEFAULT_MODEL_NAME = "LibLinear";
+    private static final String DEFAULT_ANALYZER_NAME = "Standard";
+    private static final String DEFAULT_MODEL_NAME = "RawFeaturesLibLinear";
 
     private String _analyzerName = DEFAULT_ANALYZER_NAME;
     private String _modelName = DEFAULT_MODEL_NAME;

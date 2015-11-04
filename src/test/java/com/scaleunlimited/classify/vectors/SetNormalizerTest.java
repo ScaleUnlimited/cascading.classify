@@ -15,48 +15,37 @@
  */
 package com.scaleunlimited.classify.vectors;
 
-import static org.junit.Assert.*;
-
-import java.util.LinkedList;
-import java.util.List;
-
-import junit.framework.Assert;
+import static org.junit.Assert.assertEquals;
 
 import org.apache.mahout.math.RandomAccessSparseVector;
-import org.apache.mahout.math.Vector;
 import org.junit.Test;
 
 public class SetNormalizerTest {
 
     @Test
     public void testNormalization() {
-        List<Vector> vectors = new LinkedList<Vector>();
+
+        BaseNormalizer normalizer = new SetNormalizer();
 
         RandomAccessSparseVector v = new RandomAccessSparseVector(3);
         v.setQuick(0, 2.0);
         v.setQuick(1, 8.0);
         v.setQuick(2, 0.0);
-        vectors.add(v);
+        normalizer.normalize(v);
+
+        assertEquals(0.5, v.get(0), 0.001);
+        assertEquals(0.5, v.get(1), 0.001);
+        assertEquals(0.0, v.get(2), 0.001);
 
         v = new RandomAccessSparseVector(3);
         v.setQuick(0, 4.0);
         v.setQuick(1, 0.0);
         v.setQuick(2, 0.0);
-        vectors.add(v);
+        normalizer.normalize(v);
 
-        BaseNormalizer normalizer = new SetNormalizer();
-        normalizer.normalize(vectors);
-
-        Assert.assertEquals(2, vectors.size());
-        Vector v1 = vectors.get(0);
-        assertEquals(0.5, v1.get(0), 0.001);
-        assertEquals(0.5, v1.get(1), 0.001);
-        assertEquals(0.0, v1.get(2), 0.001);
-        
-        Vector v2 = vectors.get(1);
-        assertEquals(1.0, v2.get(0), 0.001);
-        assertEquals(0.0, v2.get(1), 0.001);
-        assertEquals(0.0, v2.get(2), 0.001);
+        assertEquals(1.0, v.get(0), 0.001);
+        assertEquals(0.0, v.get(1), 0.001);
+        assertEquals(0.0, v.get(2), 0.001);
     }
     
 }

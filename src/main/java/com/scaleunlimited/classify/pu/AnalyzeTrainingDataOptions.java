@@ -21,7 +21,7 @@ import com.scaleunlimited.classify.ClassifyOptions;
 
 public class AnalyzeTrainingDataOptions extends ClassifyOptions {
 
-    private static final String DEFAULT_ANALYZER_NAME = "Zemanta";
+    private static final String DEFAULT_ANALYZER_NAME = "Standard";
 
     private String _analyzerName = DEFAULT_ANALYZER_NAME;
 

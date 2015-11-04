@@ -21,7 +21,7 @@ import com.scaleunlimited.classify.ClassifyOptions;
 
 public class TrainSpyModelOptions extends ClassifyOptions {
 
-    private static final String DEFAULT_MODEL_NAME = "LibLinear";
+    private static final String DEFAULT_MODEL_NAME = "RawFeaturesLibLinear";
 
     private String _modelName = DEFAULT_MODEL_NAME;
     private long _randomSeed = System.currentTimeMillis();

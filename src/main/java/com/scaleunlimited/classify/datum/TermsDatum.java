@@ -29,8 +29,6 @@ import com.scaleunlimited.classify.analyzer.TextDatumAnalyzer;
  * for a single document (likely originating through the analysis of a
  * single {@link TextDatum} by an analyzer ({@link TextDatumAnalyzer} subclass).
  * Training documents should have non-null labels.
- * 
- * TODO CSc Support training score <i>input</i> as well?
  */
 @SuppressWarnings("serial")
 public class TermsDatum extends LabeledDatum {
