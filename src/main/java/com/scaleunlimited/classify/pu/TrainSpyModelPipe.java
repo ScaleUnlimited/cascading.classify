@@ -84,7 +84,7 @@ public class TrainSpyModelPipe extends SubAssembly {
                                 Pipe unlabeledPipe,
                                 BaseModel model,
                                 long randomSeed) {
-        super();
+        super(positivePipe, unlabeledPipe);
         
         // Choose random sample S of the positive docs P
         SplitterAssembly splitter =

@@ -54,7 +54,7 @@ import com.scaleunlimited.classify.datum.TextDatum;
 public class ClassifyDocsPipe extends SubAssembly {
 
     public ClassifyDocsPipe(Pipe inputPipe, IAnalyzer analyzer, BaseModel model) {
-        super();
+        super(inputPipe);
         
         // Analyze the input text into terms
         Pipe termsPipe = new Pipe("input terms", inputPipe);

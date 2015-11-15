@@ -112,7 +112,7 @@ public class TrainLogisticModelPipe extends SubAssembly {
                                     IAnalyzer analyzer,
                                     BaseModel model,
                                     String modelTailPipeName) {
-        super();
+        super(positivePipe, negativePipe);
         
         // Analyze the training text into terms
         positivePipe =

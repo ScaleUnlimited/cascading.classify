@@ -52,7 +52,7 @@ public class AnalyzeTrainingDataPipe extends SubAssembly {
     public AnalyzeTrainingDataPipe( Pipe positivePipe,
                                     Pipe unlabeledPipe,
                                     IAnalyzer analyzer) {
-        super();
+        super(positivePipe, unlabeledPipe);
 
         Pipe positiveTermsPipe =
             new Pipe(POSITIVE_TERMS_PIPE_NAME, positivePipe);

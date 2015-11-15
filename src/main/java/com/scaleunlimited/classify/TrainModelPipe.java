@@ -53,7 +53,7 @@ public class TrainModelPipe extends SubAssembly {
                             IAnalyzer analyzer,
                             BaseModel model,
                             String modelTailPipeName) {
-        super();
+        super(trainingPipe);
         
         // Analyze the training text into terms
         Pipe termsPipe = new Pipe("training terms", trainingPipe);

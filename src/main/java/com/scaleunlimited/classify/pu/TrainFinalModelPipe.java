@@ -47,7 +47,7 @@ public class TrainFinalModelPipe extends SubAssembly {
                                 Pipe reliablyNegativePipe,
                                 IAnalyzer analyzer,
                                 BaseModel model) {
-        super();
+        super(positivePipe);
         
         // Label the positive/negative training terms
         // Note that we've already analyzed this training data

@@ -120,7 +120,7 @@ public class GetRNThresholdPipe extends SubAssembly {
                                 IAnalyzer analyzer,
                                 BaseModel model,
                                 double noiseLevel) {
-        super();
+        super(spiesPipe);
 
         ClassifyDocsPipe classifyPipe =
             new ClassifyDocsPipe(spiesPipe, analyzer, model);
